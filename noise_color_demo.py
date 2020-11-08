@@ -67,6 +67,26 @@ def generate_brown_noise(duration: float, f_sample: float) -> np.ndarray:
     # generate the signal from the frequency coefficients
     return generate_signal_from_spectrum(C_k)
 
+def generate_infrared_noise(duration: float, f_sample: float) -> np.ndarray:
+    """
+    generates a real valued time domain signal of 'infrared' noise. Signal is aprox. scaled to ~[-1;1].
+    :param duration: duration the noise signal should have in seconds
+    :param f_sample: sample frequency, determines the frequency/time resolution
+    :return: np.ndarray, dtype='float': real valued time domain signal ~[-1;1] of 'infrared' noise
+    """
+    # calculate the number of time points and the time difference between them
+    length = duration * f_sample
+    delta_t = 1 / f_sample
+    # get the angular frequency axis in [omega]
+    # calculate the frequency coefficients based on the noise color
+    # 'infrared' noise has power spectral density of 1/(f**4) -> the amplitude has 1/(f**2)
+    f_k = sc.fft.fftfreq(length, d=delta_t) / (2 * np.pi)
+    C_k = np.ndarray(length)
+    C_k[1:] = 1 / (np.abs(f_k[1:])**2)
+    # no dc
+    C_k[0] = 0
+    # generate the signal from the frequency coefficients
+    return generate_signal_from_spectrum(C_k)
 
 def generate_white_noise(duration: float, f_sample: float) -> np.ndarray:
     """
@@ -92,7 +112,7 @@ fs = 44500  # < [Hz]
 # duration of signal
 dur_signal = 3  # < [s]
 # length of the time domain signal displayed
-dur_snipped = 0.1  # < [s]
+dur_snipped = 2# < [s]
 
 # calculate the number of points
 signal_len = int(fs * dur_signal)
@@ -199,6 +219,43 @@ sub[1].set_xlabel("frequency [Hz]")
 sub[1].set_xscale('log')
 
 noise_signal = generate_brown_noise(dur_signal, fs)
+# time domain subplot with duration of {dur_snipped}
+sub[0].plot([i / fs for i in range(snipped_len)], noise_signal[:int(dur_snipped * fs)])
+# calculate the power spectral density of the noise
+# calculate the fft of the signal
+noise_psd = sc.fft.fft(noise_signal)
+# only take the positive half side and only the amount of the complex values
+noise_psd = np.abs(noise_psd[:signal_len // 2])
+# calculate the decibel value psd[dB] = 10* log10(amplitude[lin]**2) = 20* log10(amplitude[lin])
+noise_psd = 20 * np.log10(noise_psd)
+
+sub[1].plot(np.linspace(0, fs/2, signal_len//2)[1:], noise_psd[1:])
+plt.show(block=False)
+plt.pause(0.1)
+while True:
+    ans = input("for playing the noise sound press p, for coniuing to the next noise press c")
+    if len(ans) == 1:
+        if ans.count("c") != 0:
+            break
+        if ans.count("p") != 0:
+            sd.play(noise_signal, fs)
+
+
+# brown noise
+noise_color = "infrared"
+
+sub[0].clear()
+sub[0].set_title(f"{noise_color} noise: time domain signal")
+sub[0].set_xlabel("time(s)")
+sub[0].set_ylabel("amplitude")
+
+sub[1].clear()
+sub[1].set_title(f"{noise_color} noise: frequency domain signal")
+sub[1].set_ylabel("power [dB]")
+sub[1].set_xlabel("frequency [Hz]")
+sub[1].set_xscale('log')
+
+noise_signal = generate_infrared_noise(dur_signal, fs)
 # time domain subplot with duration of {dur_snipped}
 sub[0].plot([i / fs for i in range(snipped_len)], noise_signal[:int(dur_snipped * fs)])
 # calculate the power spectral density of the noise
